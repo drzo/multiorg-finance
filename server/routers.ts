@@ -518,6 +518,312 @@ export const appRouter = router({
         return await db.getFinancialSummary(input.organizationId, input.startDate, input.endDate);
       }),
   }),
+
+  // ===== HYPERGRAPH - Multi-Agent Networks =====
+  hypergraph: router({
+    // Agents
+    createAgent: protectedProcedure
+      .input(z.object({
+        entityId: z.number(),
+        entityType: z.enum(["organization", "user", "population"]),
+        agentType: z.enum(["individual", "collective", "population"]),
+        name: z.string(),
+        attributes: z.any().optional(),
+        state: z.any().optional(),
+        behaviorModel: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createAgent(input);
+      }),
+    
+    getAgentsByType: protectedProcedure
+      .input(z.object({ agentType: z.enum(["individual", "collective", "population"]) }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getAgentsByType(input.agentType);
+      }),
+    
+    getAgentByEntity: protectedProcedure
+      .input(z.object({ entityType: z.string(), entityId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getAgentByEntity(input.entityType, input.entityId);
+      }),
+    
+    // Shareholding - Multi-Parent Ownership
+    createShareholding: protectedProcedure
+      .input(z.object({
+        childOrgId: z.number(),
+        parentOrgId: z.number(),
+        sharePercentage: z.number().min(0).max(10000), // Basis points
+        shareClass: z.string().optional(),
+        votingRights: z.number().optional(),
+        acquisitionDate: z.date().optional(),
+        attributes: z.any().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createShareholding(input);
+      }),
+    
+    getShareholdersByOrg: protectedProcedure
+      .input(z.object({ orgId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getShareholdersByOrg(input.orgId);
+      }),
+    
+    getSubsidiariesByOrg: protectedProcedure
+      .input(z.object({ orgId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getSubsidiariesByOrg(input.orgId);
+      }),
+    
+    getEffectiveOwnership: protectedProcedure
+      .input(z.object({ parentOrgId: z.number(), maxDepth: z.number().optional() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getEffectiveOwnership(input.parentOrgId, input.maxDepth);
+      }),
+    
+    // Relationships - Multiplex Networks
+    createRelationshipType: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        category: z.enum(["ownership", "partnership", "transaction", "dependency", "communication", "hierarchy", "custom"]),
+        isDirected: z.boolean().default(true),
+        isWeighted: z.boolean().default(false),
+        attributes: z.any().optional(),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createRelationshipType(input);
+      }),
+    
+    getRelationshipTypes: protectedProcedure
+      .query(async () => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getRelationshipTypes();
+      }),
+    
+    createRelationship: protectedProcedure
+      .input(z.object({
+        relationshipTypeId: z.number(),
+        sourceEntityId: z.number(),
+        sourceEntityType: z.enum(["organization", "user", "agent"]),
+        targetEntityId: z.number(),
+        targetEntityType: z.enum(["organization", "user", "agent"]),
+        weight: z.number().optional(),
+        attributes: z.any().optional(),
+        validFrom: z.date().optional(),
+        validTo: z.date().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createRelationship(input);
+      }),
+    
+    getRelationshipsByEntity: protectedProcedure
+      .input(z.object({ entityType: z.string(), entityId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getRelationshipsByEntity(input.entityType, input.entityId);
+      }),
+    
+    // Hypergraph Operations
+    createHypergraphNode: protectedProcedure
+      .input(z.object({
+        nodeType: z.string(),
+        entityId: z.number(),
+        label: z.string(),
+        properties: z.any().optional(),
+        embedding: z.any().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createHypergraphNode(input);
+      }),
+    
+    getHypergraphNodeByEntity: protectedProcedure
+      .input(z.object({ nodeType: z.string(), entityId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getHypergraphNodeByEntity(input.nodeType, input.entityId);
+      }),
+    
+    createHypergraphHyperedge: protectedProcedure
+      .input(z.object({
+        edgeType: z.string(),
+        label: z.string().optional(),
+        properties: z.any().optional(),
+        weight: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createHypergraphHyperedge(input);
+      }),
+    
+    createHypergraphIncidence: protectedProcedure
+      .input(z.object({
+        hyperedgeId: z.number(),
+        nodeId: z.number(),
+        role: z.string().optional(),
+        weight: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createHypergraphIncidence(input);
+      }),
+    
+    getHypergraphNeighborhood: protectedProcedure
+      .input(z.object({ nodeId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getHypergraphNeighborhood(input.nodeId);
+      }),
+    
+    // Events & State Transitions
+    createEvent: protectedProcedure
+      .input(z.object({
+        eventType: z.string(),
+        timestamp: z.date(),
+        sourceEntityId: z.number().optional(),
+        sourceEntityType: z.string().optional(),
+        targetEntityId: z.number().optional(),
+        targetEntityType: z.string().optional(),
+        stateBefore: z.any().optional(),
+        stateAfter: z.any().optional(),
+        eventData: z.any().optional(),
+        causedBy: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createEvent(input);
+      }),
+    
+    getEventTimeline: protectedProcedure
+      .input(z.object({ entityType: z.string(), entityId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getEventTimeline(input.entityType, input.entityId);
+      }),
+    
+    createStateTransition: protectedProcedure
+      .input(z.object({
+        entityType: z.string(),
+        fromState: z.string(),
+        toState: z.string(),
+        eventType: z.string(),
+        conditions: z.any().optional(),
+        actions: z.any().optional(),
+        probability: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createStateTransition(input);
+      }),
+    
+    getValidTransitions: protectedProcedure
+      .input(z.object({ entityType: z.string(), fromState: z.string() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getValidTransitions(input.entityType, input.fromState);
+      }),
+    
+    // System Dynamics - Stocks & Flows
+    createStock: protectedProcedure
+      .input(z.object({
+        entityId: z.number(),
+        entityType: z.string(),
+        stockName: z.string(),
+        currentValue: z.number(),
+        unit: z.string().optional(),
+        minValue: z.number().optional(),
+        maxValue: z.number().optional(),
+        initialValue: z.number().optional(),
+        attributes: z.any().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createStock(input);
+      }),
+    
+    getStocksByEntity: protectedProcedure
+      .input(z.object({ entityType: z.string(), entityId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getStocksByEntity(input.entityType, input.entityId);
+      }),
+    
+    createFlow: protectedProcedure
+      .input(z.object({
+        flowName: z.string(),
+        sourceStockId: z.number().optional(),
+        targetStockId: z.number().optional(),
+        flowType: z.enum(["inflow", "outflow", "biflow"]),
+        rateFormula: z.string(),
+        currentRate: z.number().optional(),
+        unit: z.string().optional(),
+        attributes: z.any().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createFlow(input);
+      }),
+    
+    getFlowsByStock: protectedProcedure
+      .input(z.object({ stockId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getFlowsByStock(input.stockId);
+      }),
+    
+    getStockFlowDynamics: protectedProcedure
+      .input(z.object({ entityType: z.string(), entityId: z.number() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getStockFlowDynamics(input.entityType, input.entityId);
+      }),
+    
+    createSimulationRun: protectedProcedure
+      .input(z.object({
+        runName: z.string(),
+        startTime: z.date(),
+        endTime: z.date(),
+        timeStep: z.number(),
+        parameters: z.any().optional(),
+        results: z.any().optional(),
+        status: z.enum(["running", "completed", "failed"]).optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.createSimulationRun(input);
+      }),
+    
+    updateSimulationRun: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        updates: z.object({
+          status: z.enum(["running", "completed", "failed"]).optional(),
+          results: z.any().optional(),
+          completedAt: z.date().optional(),
+        }),
+      }))
+      .mutation(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.updateSimulationRun(input.id, input.updates);
+      }),
+    
+    getSimulationRuns: protectedProcedure
+      .input(z.object({ limit: z.number().optional() }))
+      .query(async ({ input }) => {
+        const hypergraphDb = await import("./hypergraph-db");
+        return await hypergraphDb.getSimulationRuns(input.limit);
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
